@@ -385,20 +385,22 @@ class ETL:
             print('output: ' + table)
 
     def create_model_record(self, sf, label, type, is_active):
-        rs = sf.CAT_Model__c.create({'Name' : label[0:80], 'Active__c' : is_active})
-        if not rs['success']: raise Exception('couldn\'t create record')
-        return rs['id']
+        if sf:
+            rs = sf.CAT_Model__c.create({'Name' : label[0:80], 'Active__c' : is_active})
+            if not rs['success']: raise Exception('couldn\'t create record')
+            return rs['id']
 
     def execute(self, sf, table, data, cleanup = False):
         print('executing', table, datetime.datetime.now())
-        rs = sf.bulk.__getattr__(table).insert(data)
-        for r in rs:
-            if not r['success']:
-                print(r)
-        print('execution complete', datetime.datetime.now())
-        return True
+        if sf:
+            rs = sf.bulk.__getattr__(table).insert(data)
+            for r in rs:
+                if not r['success']:
+                    print(r)
+            print('execution complete', datetime.datetime.now())
+            return True
 
-    def transfer(self, sf):
+    def transfer(self, sf, args):
         print('start', datetime.datetime.now())
         name = self.wb['Inputs']['B8'].value
         model_id = self.create_model_record(sf, name, '',True)
@@ -407,6 +409,10 @@ class ETL:
             if sheet_name in ('System Costs','Home','Inputs','Sheet2','RBC Returns Old','SDP Returns Old'): continue
             sheet = self.wb[sheet_name]
             table = 'CAT_Model_' + self.generate_table_name(sheet_name) + '__c'
+            if args and args.verbose:
+                print('---------------------------------------')
+                print('loading sheet: ', sheet_name)
+                print('inserting to table: ', table)
             data = []
             for i, row in enumerate(sheet.iter_rows()):
                 copy = {}
@@ -420,6 +426,8 @@ class ETL:
                         value = None
 
                     copy[get_column_letter(n+1) + '__c']= value
+                if args and args.verbose:
+                    print('record: ',copy)
                 data.append(copy)
             self.execute(sf, table, data, True)
 
